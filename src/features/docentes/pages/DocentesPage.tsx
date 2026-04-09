@@ -140,7 +140,7 @@ export default function DocentesPage() {
                         <Avatar src={item.foto_url ?? undefined} alt={item.email} />
                       </TableCell>
                       <TableCell>
-                        {item.primer_nombre} {item.segundo_nombre} {item.primer_apellido} {item.segundo_apellido}
+                        {`${item.primer_nombre} ${item.segundo_nombre || ''} ${item.primer_apellido} ${item.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim()}
                       </TableCell>
                       <TableCell>{item.email}</TableCell>
                       <TableCell>
