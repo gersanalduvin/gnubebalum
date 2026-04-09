@@ -1,0 +1,56 @@
+# Project Rules: Next.js Frontend (gnube)
+
+## 1. Architecture
+- **Framework**: Next.js 15 (App Router).
+- **Template**: Materialize Next.js Admin Template.
+- **Structure**:
+  - `src/app`: Routes/Pages.
+  - `src/features`: Business Modules (e.g., `features/users`).
+  - `src/components`: Global shared components (prefer template widgets).
+  - `src/services`: API connections.
+  - `src/lib`: Configuration (`axios.ts`, `auth.ts`).
+
+## 2. Design Principles
+- **Reuse**: ALWAYS use components from template (`components/widgets`, `components/forms`) before creating new ones.
+- **Style**: Use Materialize styles. Custom styles in `features/[module]/components` only if necessary.
+- **Layout**: Wrap pages in `components/layout/Layout.tsx`.
+- **Forms**: Use compact designs.
+
+## 3. Data & API
+- **Connection**: Use provided Backend APIs. NO mock data.
+- **Auth**: Endpoint `/api/login` (Email: `gersanalduvin@gmail.com`, Pass: `12345678`).
+- **Error Handling**:
+  - Backend returns `{ success: false, errors: { field: string[] } }`.
+  - Frontend: Use `ValidationErrors` (string arrays).
+  - Display: `helperText` for specific fields, `toast.error` for general errors.
+  - Prioritize "configuration" errors.
+
+## 4. Development Standards
+- **Naming**: `PascalCase.tsx` (Components), `useHook.ts` (Hooks), `service.ts` (Services).
+- **API Calls**: ALWAYS via `service.ts`, never inside components.
+- **Linting**: Mandatory `npm run build` & TypeScript check before completion. Do not leave console logs.
+
+## 5. UI/UX Rules
+- **Feedback**:
+  - Success: `toast.success`.
+  - Error: `showValidationError` or `toast.error`.
+  - Loading: Show spinners/loading states during requests.
+- **Required Fields**: Mark with `*`.
+- **Permissions**:
+  - Use `PermissionGuard`.
+  - UI elements (buttons) hide if permission is missing.
+
+## 6. PDF & Excel Handling
+- **PDF**:
+  - Open in **new tab**: `window.open(url, '_blank')`.
+  - Revoke object URL after timeout.
+  - Handle 401 errors (redirect to login).
+- **Excel**:
+  - Fetch as Blob (`spreadhseetml.sheet`).
+  - Create anchor `<a download>` and click programmatically.
+
+## 7. Auditing (Frontend Side)
+- **Mandatory**: Include "Audit" button in CRUD tables and Edit modals.
+- **Component**: `AuditoriaModal`.
+- **Service**: `auditoriaService.getSummary`.
+- **Icon**: `HistoryIcon` or `ManageHistoryIcon`.
