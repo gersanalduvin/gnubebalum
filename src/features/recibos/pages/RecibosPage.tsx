@@ -3,7 +3,8 @@
 import { usePermissions } from '@/hooks/usePermissions'
 import { Delete as DeleteIcon, Paid as PaidIcon, PictureAsPdf as PdfIcon, Person as PersonIcon, ReceiptLong as ReceiptIcon, Search as SearchIcon } from '@mui/icons-material'
 import { Alert, Box, Button, Card, CardContent, CircularProgress, FormControl, Grid, IconButton, InputAdornment, InputLabel, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
-import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { toast } from 'react-hot-toast'
 import AlumnoSearchModal from '../components/AlumnoSearchModal'
 import ArancelesSearchModal from '../components/ArancelesSearchModal'
@@ -16,6 +17,7 @@ import type { Alumno, ReciboDetalleRequest } from '../types'
 
 const RecibosPage: React.FC = () => {
   const { hasPermission } = usePermissions()
+  const searchParams = useSearchParams()
   const canView = hasPermission('recibos.index')
 
   const [numeroRecibo, setNumeroRecibo] = useState('')
@@ -55,6 +57,32 @@ const RecibosPage: React.FC = () => {
   useEffect(() => {
     cargarNumeroRecibo('interno')
   }, [])
+
+  // Cargar alumno desde Query Params (Deep Link)
+  useEffect(() => {
+    const studentId = searchParams.get('studentId')
+    const autoOpen = searchParams.get('autoOpenPendientes')
+    
+    if (studentId && canView) {
+      setParamLoading(true)
+      recibosService.searchAlumnos('', 100).then(resp => {
+        if (resp.success && resp.data) {
+          const match = resp.data.find(a => String(a.id) === String(studentId))
+          if (match) {
+            setAlumno(match)
+            if (match.formato === 'cualitativo') {
+                handleTipoChange('interno')
+            } else if (match.formato === 'cuantitativo') {
+                handleTipoChange('externo')
+            }
+            if (autoOpen === 'true') {
+              setTimeout(() => setPendientesModal(true), 500)
+            }
+          }
+        }
+      }).finally(() => setParamLoading(false))
+    }
+  }, [searchParams, canView])
 
   useEffect(() => {
     if (alumno) {

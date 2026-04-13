@@ -15,4 +15,5 @@ export type AlumnoGrupoItem = {
   sexo: string
   grupo_id: number
   grupo_nombre: string
+  total_pendiente: number
 }

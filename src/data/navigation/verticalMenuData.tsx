@@ -474,6 +474,13 @@ const useVerticalMenuData = (): VerticalMenuDataType[] => {
       })
     }
 
+    if (hasPermission('cobros_grupo.index')) {
+      cajaChildren.push({
+        label: 'Cobro por Grupo',
+        href: '/caja/cobros-grupo'
+      })
+    }
+
     if (hasPermission('recibos.index')) {
       cajaChildren.push({
         label: 'Recibos',
