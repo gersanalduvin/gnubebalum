@@ -129,6 +129,15 @@ const useVerticalMenuData = (): VerticalMenuDataType[] => {
       })
     }
 
+    // 5.5 Gestión de Notas (Administrativos con permiso gestionar.notas.administrativo)
+    if (hasPermission('gestionar.notas.administrativo')) {
+      menuItems.push({
+        label: 'Gestión de Notas',
+        href: '/admin/notas',
+        icon: 'ri-edit-2-line'
+      })
+    }
+
     // Submenú de Asistencias para Docente
     if (hasPermission('operaciones.docentes') && user?.tipo_usuario === 'docente') {
       menuItems.push({
@@ -597,7 +606,7 @@ const useVerticalMenuData = (): VerticalMenuDataType[] => {
     }
 
     // Agregar "Boletín Escolar"
-    if (hasPermission('generar.boletin')) {
+    if (hasPermission('generar.boletin') || (hasPermission('operaciones.docentes') && user?.tipo_usuario === 'docente')) {
       reportesChildren.push({
         label: 'Boletín Escolar',
         href: '/reportes/boletin-escolar'
@@ -605,7 +614,7 @@ const useVerticalMenuData = (): VerticalMenuDataType[] => {
     }
 
     // Agregar "Consolidado de Notas"
-    if (hasPermission('generar.consolidado_notas')) {
+    if (hasPermission('generar.consolidado_notas') || (hasPermission('operaciones.docentes') && user?.tipo_usuario === 'docente')) {
       reportesChildren.push({
         label: 'Consolidado de Notas',
         href: '/reportes/consolidado-notas'

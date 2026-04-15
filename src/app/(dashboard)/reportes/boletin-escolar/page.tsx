@@ -1,6 +1,8 @@
 'use client'
 
+import gruposService from '@/features/config-grupos/services/gruposService'
 import { boletinEscolarService } from '@/features/reportes/services/boletinEscolarService'
+import periodoLectivoService from '@/features/periodo-lectivo/services/periodoLectivoService'
 import { usePermissions } from '@/hooks/usePermissions'
 import { School as SchoolIcon } from '@mui/icons-material'
 import {
@@ -20,73 +22,48 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
 const BoletinEscolarPage = () => {
-  const { hasPermission, isSuperAdmin } = usePermissions()
-  const canView = isSuperAdmin || hasPermission('generar.boletin')
+  const { hasPermission, isSuperAdmin, user } = usePermissions()
+  const isDocente = hasPermission('operaciones.docentes') && !isSuperAdmin
+  const canView = isSuperAdmin || hasPermission('generar.boletin') || hasPermission('operaciones.docentes')
 
-  // Filter options
   const [periodos, setPeriodos] = useState<any[]>([])
   const [grupos, setGrupos] = useState<any[]>([])
   const [cortes, setCortes] = useState<any[]>([])
 
-  // Selected filters
   const [filters, setFilters] = useState({
     periodo_lectivo_id: '',
     grupo_id: '',
     corte_id: '',
-    // En Boletin Escolar is always shown with scale or custom, but we can keep it hardcoded to true
-    // since individual boletins always have scale in this logic unless overriden. We default to true in backend visually.
     mostrar_escala: true
   })
 
-  // Loaders
   const [loadingPeriodos, setLoadingPeriodos] = useState(false)
   const [loadingGrupos, setLoadingGrupos] = useState(false)
   const [loadingCortes, setLoadingCortes] = useState(false)
   const [generatingBoletin, setGeneratingBoletin] = useState(false)
 
-  // Load academic periods on mount
-  useEffect(() => {
-    if (canView) {
-      loadPeriodos()
-    }
-  }, [canView])
-
-  // Load groups when period changes
-  useEffect(() => {
-    if (filters.periodo_lectivo_id) {
-      loadGrupos(Number(filters.periodo_lectivo_id))
-      loadCortes(Number(filters.periodo_lectivo_id))
-    } else {
-      setGrupos([])
-      setCortes([])
-    }
-    setFilters(prev => ({ ...prev, grupo_id: '', corte_id: '' }))
-  }, [filters.periodo_lectivo_id])
-
   const loadPeriodos = async () => {
     setLoadingPeriodos(true)
     try {
-      const resp = await boletinEscolarService.getPeriodos()
+      const resp = await periodoLectivoService.getAllPeriodosLectivos()
       setPeriodos(resp?.data || [])
-    } catch (error) {
-      console.error(error)
-      toast.error('Error al cargar periodos')
-    } finally {
-      setLoadingPeriodos(false)
-    }
+    } catch { toast.error('Error al cargar periodos') }
+    finally { setLoadingPeriodos(false) }
   }
 
-  const loadGrupos = async (periodoId: number) => {
+  const loadGrupos = async (periodoId?: string) => {
     setLoadingGrupos(true)
     try {
-      const resp = await boletinEscolarService.getGrupos(periodoId)
-      setGrupos(resp?.data || [])
-    } catch (error) {
-      console.error(error)
-      toast.error('Error al cargar grupos')
-    } finally {
-      setLoadingGrupos(false)
-    }
+      if (isDocente) {
+        const resp = await gruposService.getMyActiveGroups()
+        setGrupos(resp?.data || [])
+      } else {
+        if (!periodoId) return
+        const resp = await boletinEscolarService.getGrupos(Number(periodoId))
+        setGrupos(resp?.data || [])
+      }
+    } catch { setGrupos([]) }
+    finally { setLoadingGrupos(false) }
   }
 
   const loadCortes = async (periodoId: number) => {
@@ -94,20 +71,47 @@ const BoletinEscolarPage = () => {
     try {
       const resp = await boletinEscolarService.getCortes(periodoId)
       setCortes(resp?.data || [])
-    } catch (error) {
-      console.error(error)
-      toast.error('Error al cargar cortes')
-    } finally {
-      setLoadingCortes(false)
+    } catch { toast.error('Error al cargar cortes') }
+    finally { setLoadingCortes(false) }
+  }
+
+  // On mount: docente gets groups directly; admin gets periods
+  useEffect(() => {
+    if (!user) return
+    if (isDocente) {
+      loadGrupos()
+    } else {
+      loadPeriodos()
     }
+  }, [user, isSuperAdmin])
+
+  // Admin: reload groups + cortes when period changes
+  useEffect(() => {
+    if (!isDocente && filters.periodo_lectivo_id) {
+      loadGrupos(filters.periodo_lectivo_id)
+      loadCortes(Number(filters.periodo_lectivo_id))
+      setFilters(prev => ({ ...prev, grupo_id: '', corte_id: '' }))
+    }
+  }, [filters.periodo_lectivo_id])
+
+  // When group changes: derive periodoId and load cortes (important for docente)
+  const handleGrupoChange = (grupoId: string) => {
+    const selectedGrupo = grupos.find((g: any) => g.id === Number(grupoId))
+    const periodoId = selectedGrupo?.periodo_lectivo_id
+    setFilters(prev => ({
+      ...prev,
+      grupo_id: grupoId,
+      corte_id: '',
+      ...(periodoId ? { periodo_lectivo_id: String(periodoId) } : {})
+    }))
+    if (periodoId) loadCortes(periodoId)
   }
 
   const handleGenerarBoletinPDF = async () => {
     if (!filters.grupo_id || !filters.periodo_lectivo_id) {
-      toast.error('Seleccione periodo y grupo')
+      toast.error('Seleccione grupo')
       return
     }
-
     setGeneratingBoletin(true)
     try {
       await boletinEscolarService.generarBoletinPDF({
@@ -117,8 +121,7 @@ const BoletinEscolarPage = () => {
         mostrar_escala: filters.mostrar_escala
       })
       toast.success('Boletín generado exitosamente')
-    } catch (error) {
-      console.error(error)
+    } catch {
       toast.error('Error al generar boletín')
     } finally {
       setGeneratingBoletin(false)
@@ -138,41 +141,35 @@ const BoletinEscolarPage = () => {
       <Card>
         <CardHeader title='Boletín Escolar' subheader='Genere boletines individuales por grupo' />
         <CardContent>
-          <Grid container spacing={3}>
-            {/* Periodo Lectivo */}
-            <Grid item xs={12} md={4}>
-              <TextField
-                select
-                fullWidth
-                label='Periodo Lectivo'
-                value={filters.periodo_lectivo_id}
-                onChange={e => setFilters(prev => ({ ...prev, periodo_lectivo_id: e.target.value }))}
-                disabled={loadingPeriodos}
-                InputProps={{
-                  endAdornment: loadingPeriodos ? <CircularProgress size={20} /> : null
-                }}
-              >
-                <MenuItem value=''>Seleccione un periodo</MenuItem>
-                {periodos.map((p: any) => (
-                  <MenuItem key={p.id} value={p.id}>
-                    {p.nombre}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
+          <Grid container spacing={3} alignItems='center'>
+            {/* Periodo Lectivo — solo admin */}
+            {!isDocente && (
+              <Grid item xs={12} md={4}>
+                <TextField
+                  select fullWidth size='small'
+                  label='Periodo Lectivo'
+                  value={filters.periodo_lectivo_id}
+                  onChange={e => setFilters(prev => ({ ...prev, periodo_lectivo_id: e.target.value }))}
+                  disabled={loadingPeriodos}
+                  InputProps={{ endAdornment: loadingPeriodos ? <CircularProgress size={20} /> : null }}
+                >
+                  <MenuItem value=''>Seleccione un periodo</MenuItem>
+                  {periodos.map((p: any) => (
+                    <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
 
             {/* Grupo */}
             <Grid item xs={12} md={4}>
               <TextField
-                select
-                fullWidth
+                select fullWidth size='small'
                 label='Grupo'
                 value={filters.grupo_id}
-                onChange={e => setFilters(prev => ({ ...prev, grupo_id: e.target.value }))}
-                disabled={!filters.periodo_lectivo_id || loadingGrupos}
-                InputProps={{
-                  endAdornment: loadingGrupos ? <CircularProgress size={20} /> : null
-                }}
+                onChange={e => handleGrupoChange(e.target.value)}
+                disabled={(isDocente ? false : !filters.periodo_lectivo_id) || loadingGrupos}
+                InputProps={{ endAdornment: loadingGrupos ? <CircularProgress size={20} /> : null }}
               >
                 <MenuItem value=''>Seleccione un grupo</MenuItem>
                 {grupos.map((g: any) => (
@@ -186,21 +183,16 @@ const BoletinEscolarPage = () => {
             {/* Corte */}
             <Grid item xs={12} md={4}>
               <TextField
-                select
-                fullWidth
+                select fullWidth size='small'
                 label='Corte Evaluativo'
                 value={filters.corte_id}
                 onChange={e => setFilters(prev => ({ ...prev, corte_id: e.target.value }))}
-                disabled={!filters.periodo_lectivo_id || loadingCortes}
-                InputProps={{
-                  endAdornment: loadingCortes ? <CircularProgress size={20} /> : null
-                }}
+                disabled={!filters.grupo_id || loadingCortes}
+                InputProps={{ endAdornment: loadingCortes ? <CircularProgress size={20} /> : null }}
               >
                 <MenuItem value=''>Todos los cortes</MenuItem>
                 {cortes.map((c: any) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.nombre} ({c.semestre_nombre})
-                  </MenuItem>
+                  <MenuItem key={c.id} value={c.id}>{c.nombre} ({c.semestre_nombre})</MenuItem>
                 ))}
                 <MenuItem value='S1'>PRIMER SEMESTRE</MenuItem>
                 <MenuItem value='S2'>SEGUNDO SEMESTRE</MenuItem>
@@ -208,23 +200,19 @@ const BoletinEscolarPage = () => {
               </TextField>
             </Grid>
 
-            {/* Action Buttons */}
+            {/* Botón acción */}
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <Button
-                  variant='contained'
-                  color='secondary'
-                  startIcon={generatingBoletin ? <CircularProgress size={18} color='inherit' /> : <SchoolIcon />}
-                  onClick={handleGenerarBoletinPDF}
-                  disabled={!filters.grupo_id || !filters.periodo_lectivo_id || generatingBoletin}
-                >
-                  Boletín Individual PDF
-                </Button>
-              </Box>
+              <Button
+                variant='contained' color='secondary'
+                startIcon={generatingBoletin ? <CircularProgress size={18} color='inherit' /> : <SchoolIcon />}
+                onClick={handleGenerarBoletinPDF}
+                disabled={!filters.grupo_id || generatingBoletin}
+              >
+                Boletín Individual PDF
+              </Button>
             </Grid>
           </Grid>
 
-          {/* Info Box */}
           <Box sx={{ mt: 3 }}>
             <Alert severity='info'>
               <Typography variant='body2'>

@@ -325,6 +325,18 @@ export const protectedRoutes: RoutePermission[] = [
     path: '/academico/organizar-listas',
     permissions: ['organizar.lista'],
     requireAll: false
+  },
+
+  // Rutas del Portal Administrativo de Notas
+  {
+    path: '/admin/notas',
+    permissions: ['gestionar.notas.administrativo'],
+    requireAll: false
+  },
+  {
+    path: '/admin/notas/asignatura',
+    permissions: ['gestionar.notas.administrativo'],
+    requireAll: false
   }
 ]
 

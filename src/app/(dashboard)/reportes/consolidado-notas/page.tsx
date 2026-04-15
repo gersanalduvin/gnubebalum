@@ -1,6 +1,8 @@
 'use client'
 
+import gruposService from '@/features/config-grupos/services/gruposService'
 import { boletinEscolarService } from '@/features/reportes/services/boletinEscolarService'
+import periodoLectivoService from '@/features/periodo-lectivo/services/periodoLectivoService'
 import { usePermissions } from '@/hooks/usePermissions'
 import { FileDownload as FileDownloadIcon, PictureAsPdf as PictureAsPdfIcon } from '@mui/icons-material'
 import {
@@ -22,15 +24,14 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
 const ConsolidadoNotasPage = () => {
-  const { hasPermission, isSuperAdmin } = usePermissions()
-  const canView = isSuperAdmin || hasPermission('generar.consolidado_notas')
+  const { hasPermission, isSuperAdmin, user } = usePermissions()
+  const isDocente = hasPermission('operaciones.docentes') && !isSuperAdmin
+  const canView = isSuperAdmin || hasPermission('generar.consolidado_notas') || hasPermission('operaciones.docentes')
 
-  // Filter options
   const [periodos, setPeriodos] = useState<any[]>([])
   const [grupos, setGrupos] = useState<any[]>([])
   const [cortes, setCortes] = useState<any[]>([])
 
-  // Selected filters
   const [filters, setFilters] = useState({
     periodo_lectivo_id: '',
     grupo_id: '',
@@ -38,56 +39,34 @@ const ConsolidadoNotasPage = () => {
     mostrar_escala: false
   })
 
-  // Loaders
   const [loadingPeriodos, setLoadingPeriodos] = useState(false)
   const [loadingGrupos, setLoadingGrupos] = useState(false)
   const [loadingCortes, setLoadingCortes] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [exportingExcel, setExportingExcel] = useState(false)
 
-  // Load academic periods on mount
-  useEffect(() => {
-    if (canView) {
-      loadPeriodos()
-    }
-  }, [canView])
-
-  // Load groups when period changes
-  useEffect(() => {
-    if (filters.periodo_lectivo_id) {
-      loadGrupos(Number(filters.periodo_lectivo_id))
-      loadCortes(Number(filters.periodo_lectivo_id))
-    } else {
-      setGrupos([])
-      setCortes([])
-    }
-    setFilters(prev => ({ ...prev, grupo_id: '', corte_id: '' }))
-  }, [filters.periodo_lectivo_id])
-
   const loadPeriodos = async () => {
     setLoadingPeriodos(true)
     try {
-      const resp = await boletinEscolarService.getPeriodos()
+      const resp = await periodoLectivoService.getAllPeriodosLectivos()
       setPeriodos(resp?.data || [])
-    } catch (error) {
-      console.error(error)
-      toast.error('Error al cargar periodos')
-    } finally {
-      setLoadingPeriodos(false)
-    }
+    } catch { toast.error('Error al cargar periodos') }
+    finally { setLoadingPeriodos(false) }
   }
 
-  const loadGrupos = async (periodoId: number) => {
+  const loadGrupos = async (periodoId?: string) => {
     setLoadingGrupos(true)
     try {
-      const resp = await boletinEscolarService.getGrupos(periodoId)
-      setGrupos(resp?.data || [])
-    } catch (error) {
-      console.error(error)
-      toast.error('Error al cargar grupos')
-    } finally {
-      setLoadingGrupos(false)
-    }
+      if (isDocente) {
+        const resp = await gruposService.getMyActiveGroups()
+        setGrupos(resp?.data || [])
+      } else {
+        if (!periodoId) return
+        const resp = await boletinEscolarService.getGrupos(Number(periodoId))
+        setGrupos(resp?.data || [])
+      }
+    } catch { setGrupos([]) }
+    finally { setLoadingGrupos(false) }
   }
 
   const loadCortes = async (periodoId: number) => {
@@ -95,20 +74,47 @@ const ConsolidadoNotasPage = () => {
     try {
       const resp = await boletinEscolarService.getCortes(periodoId)
       setCortes(resp?.data || [])
-    } catch (error) {
-      console.error(error)
-      toast.error('Error al cargar cortes')
-    } finally {
-      setLoadingCortes(false)
+    } catch { toast.error('Error al cargar cortes') }
+    finally { setLoadingCortes(false) }
+  }
+
+  // On mount
+  useEffect(() => {
+    if (!user) return
+    if (isDocente) {
+      loadGrupos()
+    } else {
+      loadPeriodos()
     }
+  }, [user, isSuperAdmin])
+
+  // Admin: reload when period changes
+  useEffect(() => {
+    if (!isDocente && filters.periodo_lectivo_id) {
+      loadGrupos(filters.periodo_lectivo_id)
+      loadCortes(Number(filters.periodo_lectivo_id))
+      setFilters(prev => ({ ...prev, grupo_id: '', corte_id: '' }))
+    }
+  }, [filters.periodo_lectivo_id])
+
+  // Docente: when group selected, derive period and load cortes
+  const handleGrupoChange = (grupoId: string) => {
+    const selectedGrupo = grupos.find((g: any) => g.id === Number(grupoId))
+    const periodoId = selectedGrupo?.periodo_lectivo_id
+    setFilters(prev => ({
+      ...prev,
+      grupo_id: grupoId,
+      corte_id: '',
+      ...(periodoId ? { periodo_lectivo_id: String(periodoId) } : {})
+    }))
+    if (periodoId) loadCortes(periodoId)
   }
 
   const handleGenerarConsolidadoPDF = async () => {
     if (!filters.grupo_id || !filters.periodo_lectivo_id) {
-      toast.error('Seleccione periodo y grupo')
+      toast.error('Seleccione grupo')
       return
     }
-
     setGeneratingPDF(true)
     try {
       await boletinEscolarService.generarConsolidadoPDF({
@@ -118,8 +124,7 @@ const ConsolidadoNotasPage = () => {
         mostrar_escala: filters.mostrar_escala
       })
       toast.success('PDF generado exitosamente')
-    } catch (error) {
-      console.error(error)
+    } catch {
       toast.error('Error al generar PDF')
     } finally {
       setGeneratingPDF(false)
@@ -128,10 +133,9 @@ const ConsolidadoNotasPage = () => {
 
   const handleExportExcel = async () => {
     if (!filters.grupo_id || !filters.periodo_lectivo_id) {
-      toast.error('Seleccione periodo y grupo')
+      toast.error('Seleccione grupo')
       return
     }
-
     setExportingExcel(true)
     try {
       await boletinEscolarService.exportConsolidadoExcel({
@@ -141,8 +145,7 @@ const ConsolidadoNotasPage = () => {
         mostrar_escala: filters.mostrar_escala
       })
       toast.success('Excel exportado exitosamente')
-    } catch (error) {
-      console.error(error)
+    } catch {
       toast.error('Error al exportar Excel')
     } finally {
       setExportingExcel(false)
@@ -162,41 +165,35 @@ const ConsolidadoNotasPage = () => {
       <Card>
         <CardHeader title='Consolidado de Notas' subheader='Genere reportes de notas consolidados por grupo' />
         <CardContent>
-          <Grid container spacing={3}>
-            {/* Periodo Lectivo */}
-            <Grid item xs={12} md={4}>
-              <TextField
-                select
-                fullWidth
-                label='Periodo Lectivo'
-                value={filters.periodo_lectivo_id}
-                onChange={e => setFilters(prev => ({ ...prev, periodo_lectivo_id: e.target.value }))}
-                disabled={loadingPeriodos}
-                InputProps={{
-                  endAdornment: loadingPeriodos ? <CircularProgress size={20} /> : null
-                }}
-              >
-                <MenuItem value=''>Seleccione un periodo</MenuItem>
-                {periodos.map((p: any) => (
-                  <MenuItem key={p.id} value={p.id}>
-                    {p.nombre}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
+          <Grid container spacing={3} alignItems='center'>
+            {/* Periodo Lectivo — solo admin */}
+            {!isDocente && (
+              <Grid item xs={12} md={4}>
+                <TextField
+                  select fullWidth size='small'
+                  label='Periodo Lectivo'
+                  value={filters.periodo_lectivo_id}
+                  onChange={e => setFilters(prev => ({ ...prev, periodo_lectivo_id: e.target.value }))}
+                  disabled={loadingPeriodos}
+                  InputProps={{ endAdornment: loadingPeriodos ? <CircularProgress size={20} /> : null }}
+                >
+                  <MenuItem value=''>Seleccione un periodo</MenuItem>
+                  {periodos.map((p: any) => (
+                    <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
 
             {/* Grupo */}
             <Grid item xs={12} md={4}>
               <TextField
-                select
-                fullWidth
+                select fullWidth size='small'
                 label='Grupo'
                 value={filters.grupo_id}
-                onChange={e => setFilters(prev => ({ ...prev, grupo_id: e.target.value }))}
-                disabled={!filters.periodo_lectivo_id || loadingGrupos}
-                InputProps={{
-                  endAdornment: loadingGrupos ? <CircularProgress size={20} /> : null
-                }}
+                onChange={e => handleGrupoChange(e.target.value)}
+                disabled={(isDocente ? false : !filters.periodo_lectivo_id) || loadingGrupos}
+                InputProps={{ endAdornment: loadingGrupos ? <CircularProgress size={20} /> : null }}
               >
                 <MenuItem value=''>Seleccione un grupo</MenuItem>
                 {grupos.map((g: any) => (
@@ -210,21 +207,16 @@ const ConsolidadoNotasPage = () => {
             {/* Corte */}
             <Grid item xs={12} md={4}>
               <TextField
-                select
-                fullWidth
+                select fullWidth size='small'
                 label='Corte Evaluativo'
                 value={filters.corte_id}
                 onChange={e => setFilters(prev => ({ ...prev, corte_id: e.target.value }))}
-                disabled={!filters.periodo_lectivo_id || loadingCortes}
-                InputProps={{
-                  endAdornment: loadingCortes ? <CircularProgress size={20} /> : null
-                }}
+                disabled={!filters.grupo_id || loadingCortes}
+                InputProps={{ endAdornment: loadingCortes ? <CircularProgress size={20} /> : null }}
               >
                 <MenuItem value=''>Todos los cortes</MenuItem>
                 {cortes.map((c: any) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.nombre} ({c.semestre_nombre})
-                  </MenuItem>
+                  <MenuItem key={c.id} value={c.id}>{c.nombre} ({c.semestre_nombre})</MenuItem>
                 ))}
                 <MenuItem value='S1'>PRIMER SEMESTRE</MenuItem>
                 <MenuItem value='S2'>SEGUNDO SEMESTRE</MenuItem>
@@ -232,7 +224,7 @@ const ConsolidadoNotasPage = () => {
               </TextField>
             </Grid>
 
-            {/* Mostrar Escala Checkbox */}
+            {/* Mostrar Escala */}
             <Grid item xs={12}>
               <FormControlLabel
                 control={
@@ -245,25 +237,22 @@ const ConsolidadoNotasPage = () => {
               />
             </Grid>
 
-            {/* Action Buttons */}
+            {/* Botones */}
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <Button
-                  variant='contained'
-                  color='primary'
+                  variant='contained' color='primary'
                   startIcon={generatingPDF ? <CircularProgress size={18} color='inherit' /> : <PictureAsPdfIcon />}
                   onClick={handleGenerarConsolidadoPDF}
-                  disabled={!filters.grupo_id || !filters.periodo_lectivo_id || generatingPDF}
+                  disabled={!filters.grupo_id || generatingPDF}
                 >
                   Consolidado PDF
                 </Button>
-
                 <Button
-                  variant='outlined'
-                  color='success'
+                  variant='outlined' color='success'
                   startIcon={exportingExcel ? <CircularProgress size={18} color='inherit' /> : <FileDownloadIcon />}
                   onClick={handleExportExcel}
-                  disabled={!filters.grupo_id || !filters.periodo_lectivo_id || exportingExcel}
+                  disabled={!filters.grupo_id || exportingExcel}
                 >
                   Exportar Excel
                 </Button>
@@ -271,15 +260,13 @@ const ConsolidadoNotasPage = () => {
             </Grid>
           </Grid>
 
-          {/* Info Box */}
           <Box sx={{ mt: 3 }}>
             <Alert severity='info'>
               <Typography variant='body2'>
-                <strong>Consolidado PDF:</strong> Genera una sábana de notas con todos los estudiantes del grupo
-                seleccionado.
+                <strong>Consolidado PDF:</strong> Genera una sábana de notas con todos los estudiantes del grupo.
               </Typography>
               <Typography variant='body2'>
-                <strong>Exportar Excel:</strong> Descarga el consolidado de notas en formato Excel (.xlsx).
+                <strong>Exportar Excel:</strong> Descarga el consolidado en formato Excel (.xlsx).
               </Typography>
             </Alert>
           </Box>

@@ -46,7 +46,7 @@ const RootLayout = async (props: ChildrenType) => {
   const direction = 'ltr'
 
   return (
-    <html id='__next' lang='en' dir={direction} suppressHydrationWarning>
+    <html id='__next' lang='es' dir={direction} translate='no' className='notranslate' suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -114,6 +114,7 @@ const RootLayout = async (props: ChildrenType) => {
           }}
         />
         <script src="/sw-cleanup.js" async></script>
+        <meta name='google' content='notranslate' />
       </head>
       <body className='flex is-full min-bs-full flex-auto flex-col' suppressHydrationWarning>
         <Providers 
