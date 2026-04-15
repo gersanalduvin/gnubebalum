@@ -18,7 +18,7 @@ import {
   TextField,
   Typography
 } from '@mui/material'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
 const BoletinEscolarPage = () => {
@@ -41,6 +41,26 @@ const BoletinEscolarPage = () => {
   const [loadingGrupos, setLoadingGrupos] = useState(false)
   const [loadingCortes, setLoadingCortes] = useState(false)
   const [generatingBoletin, setGeneratingBoletin] = useState(false)
+
+  // Memoized filters for cuts (Performance & mapping)
+  const filteredCortes = useMemo(() => {
+    return cortes
+      .filter((c: any) =>
+        c.nombre.toLowerCase().includes('corte 1') ||
+        c.nombre.toLowerCase().includes('corte 2') ||
+        c.nombre.toLowerCase().includes('corte 3') ||
+        c.nombre.toLowerCase().includes('corte 4')
+      )
+      .map((c: any) => {
+        let displayName = c.nombre
+        if (c.nombre.toLowerCase().includes('corte 1')) displayName = 'Primer Corte'
+        if (c.nombre.toLowerCase().includes('corte 2')) displayName = 'Segundo Corte'
+        if (c.nombre.toLowerCase().includes('corte 3')) displayName = 'Tercer Corte'
+        if (c.nombre.toLowerCase().includes('corte 4')) displayName = 'Cuarto Corte'
+
+        return { ...c, displayName }
+      })
+  }, [cortes])
 
   const loadPeriodos = async () => {
     setLoadingPeriodos(true)
@@ -67,6 +87,7 @@ const BoletinEscolarPage = () => {
   }
 
   const loadCortes = async (periodoId: number) => {
+    if (!periodoId) return
     setLoadingCortes(true)
     try {
       const resp = await boletinEscolarService.getCortes(periodoId)
@@ -75,7 +96,7 @@ const BoletinEscolarPage = () => {
     finally { setLoadingCortes(false) }
   }
 
-  // On mount: docente gets groups directly; admin gets periods
+  // On mount: docente gets groups; admin gets periods
   useEffect(() => {
     if (!user) return
     if (isDocente) {
@@ -83,33 +104,54 @@ const BoletinEscolarPage = () => {
     } else {
       loadPeriodos()
     }
-  }, [user, isSuperAdmin])
+  }, [user, isSuperAdmin, isDocente])
 
-  // Admin: reload groups + cortes when period changes
+  // EFFECT: Load Groups (Admin only)
   useEffect(() => {
     if (!isDocente && filters.periodo_lectivo_id) {
       loadGrupos(filters.periodo_lectivo_id)
-      loadCortes(Number(filters.periodo_lectivo_id))
       setFilters(prev => ({ ...prev, grupo_id: '', corte_id: '' }))
+    }
+  }, [filters.periodo_lectivo_id, isDocente])
+
+  // EFFECT: Load Cortes (Always based on period)
+  useEffect(() => {
+    if (filters.periodo_lectivo_id) {
+      loadCortes(Number(filters.periodo_lectivo_id))
     }
   }, [filters.periodo_lectivo_id])
 
-  // When group changes: derive periodoId and load cortes (important for docente)
+  // Passive group change logic
   const handleGrupoChange = (grupoId: string) => {
     const selectedGrupo = grupos.find((g: any) => g.id === Number(grupoId))
-    const periodoId = selectedGrupo?.periodo_lectivo_id
-    setFilters(prev => ({
-      ...prev,
-      grupo_id: grupoId,
-      corte_id: '',
-      ...(periodoId ? { periodo_lectivo_id: String(periodoId) } : {})
-    }))
-    if (periodoId) loadCortes(periodoId)
+    const periodoIdFromGrupo = selectedGrupo?.periodo_lectivo_id
+
+    setFilters(prev => {
+      const updates: any = {
+        grupo_id: grupoId
+      }
+
+      // Para docentes (periodo no seleccionado) o si el periodo está vacío, lo seteamos
+      // Esto activará automáticamente el useEffect de carga de cortes
+      if (!prev.periodo_lectivo_id && periodoIdFromGrupo) {
+        updates.periodo_lectivo_id = String(periodoIdFromGrupo)
+      }
+
+      return { ...prev, ...updates }
+    })
   }
 
   const handleGenerarBoletinPDF = async () => {
-    if (!filters.grupo_id || !filters.periodo_lectivo_id) {
-      toast.error('Seleccione grupo')
+    if (!filters.periodo_lectivo_id) {
+      toast.error('Seleccione el periodo lectivo')
+      return
+    }
+    if (!filters.grupo_id) {
+      toast.error('Seleccione el grupo')
+      return
+    }
+    if (!filters.corte_id) {
+      toast.error('Seleccione el corte evaluativo')
       return
     }
     setGeneratingBoletin(true)
@@ -187,16 +229,15 @@ const BoletinEscolarPage = () => {
                 label='Corte Evaluativo'
                 value={filters.corte_id}
                 onChange={e => setFilters(prev => ({ ...prev, corte_id: e.target.value }))}
-                disabled={!filters.grupo_id || loadingCortes}
+                disabled={!filters.periodo_lectivo_id || loadingCortes}
                 InputProps={{ endAdornment: loadingCortes ? <CircularProgress size={20} /> : null }}
               >
-                <MenuItem value=''>Todos los cortes</MenuItem>
-                {cortes.map((c: any) => (
-                  <MenuItem key={c.id} value={c.id}>{c.nombre} ({c.semestre_nombre})</MenuItem>
+                <MenuItem value=''>Seleccione un corte</MenuItem>
+                {filteredCortes.map((c: any) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.displayName}
+                  </MenuItem>
                 ))}
-                <MenuItem value='S1'>PRIMER SEMESTRE</MenuItem>
-                <MenuItem value='S2'>SEGUNDO SEMESTRE</MenuItem>
-                <MenuItem value='NF'>NOTA FINAL</MenuItem>
               </TextField>
             </Grid>
 
