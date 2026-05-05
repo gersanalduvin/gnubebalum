@@ -425,6 +425,21 @@ export class UserArancelesService {
   }
 
   /**
+   * Exportar aranceles de un grupo completo a PDF
+   */
+  static async exportPdfGrupo(grupoId: number, filters: { estado?: string } = {}): Promise<Blob> {
+    try {
+      const params = new URLSearchParams()
+      params.append('grupo_id', grupoId.toString())
+      if (filters.estado) params.append('estado', filters.estado)
+      const response = await httpClient.get<any>(`${API_BASE}/reportes/reporte-grupo?${params.toString()}`, { headers: { Accept: 'application/pdf' } })
+      return response.data
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
+  }
+
+  /**
    * Manejo centralizado de errores
    */
   private static handleError(error: any): ApiError {

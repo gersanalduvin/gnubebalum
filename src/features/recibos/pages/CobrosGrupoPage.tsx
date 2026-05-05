@@ -30,7 +30,8 @@ import {
   Search as SearchIcon,
   Person as PersonIcon,
   CheckCircle as CheckCircleIcon,
-  Money as MoneyIcon
+  Money as MoneyIcon,
+  Print as PrintIcon
 } from '@mui/icons-material'
 import { listasGrupoService } from '../../listas-grupo/services/listasGrupoService'
 import type { CatalogosListasGrupo, AlumnoGrupoItem } from '../../listas-grupo/types'
@@ -68,11 +69,26 @@ const CobrosGrupoPage: React.FC = () => {
   const [loadingPendientes, setLoadingPendientes] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [processingPayment, setProcessingPayment] = useState(false)
+  const [printing, setPrinting] = useState(false)
 
   // Plan Assignment State
   const [availablePlans, setAvailablePlans] = useState<any[]>([])
   const [selectedPlanId, setSelectedPlanId] = useState<number | ''>('')
   const [applyingPlan, setApplyingPlan] = useState(false)
+
+  const handlePrintGroup = async () => {
+    if (!selectedGrupo) return
+    setPrinting(true)
+    try {
+      const blob = await UserArancelesService.exportPdfGrupo(Number(selectedGrupo))
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (error) {
+      toast.error('Error al generar los estados de cuenta del grupo')
+    } finally {
+      setPrinting(false)
+    }
+  }
 
   const loadAlumnos = async () => {
     if (!selectedPeriodo || !selectedGrupo) {
@@ -215,8 +231,8 @@ const CobrosGrupoPage: React.FC = () => {
             </Typography>
           </Box>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={5}>
               <FormControl fullWidth size="small">
                 <InputLabel>Período Lectivo</InputLabel>
                 <Select
@@ -236,7 +252,7 @@ const CobrosGrupoPage: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={5}>
               <FormControl fullWidth size="small">
                 <InputLabel>Grupo</InputLabel>
                 <Select
@@ -255,6 +271,19 @@ const CobrosGrupoPage: React.FC = () => {
                     ))}
                 </Select>
               </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="secondary"
+                onClick={handlePrintGroup}
+                disabled={!selectedGrupo || printing}
+                startIcon={printing ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
+                sx={{ height: 40 }}
+              >
+                Imprimir
+              </Button>
             </Grid>
           </Grid>
         </CardContent>
