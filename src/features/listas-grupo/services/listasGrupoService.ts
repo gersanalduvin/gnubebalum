@@ -47,6 +47,11 @@ class ListasGrupoService {
     if (!resp.ok) throw new Error('Error al exportar Excel')
     return await resp.blob()
   }
+
+  async exportCredencialesFamilia(grupoId: number): Promise<Blob> {
+    const response = await httpClient.get<any>(`/bk/v1/reportes/credenciales-familia/${grupoId}`, { headers: { Accept: 'application/pdf' } })
+    return response.data
+  }
 }
 
 export const listasGrupoService = new ListasGrupoService()

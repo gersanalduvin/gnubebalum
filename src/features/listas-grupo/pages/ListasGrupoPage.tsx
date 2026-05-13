@@ -18,6 +18,7 @@ export default function ListasGrupoPage() {
   const [printLoading, setPrintLoading] = useState(false) // Was pdfLoading
   const [downloadLoading, setDownloadLoading] = useState(false)
   const [excelLoading, setExcelLoading] = useState(false)
+  const [credencialesLoading, setCredencialesLoading] = useState(false)
 
   const hasLoadedRef = useRef(false)
 
@@ -119,6 +120,25 @@ export default function ListasGrupoPage() {
     }
   }
 
+  const handleCredencialesFamilia = async () => {
+    try {
+      if (!selectedGrupo || selectedGrupo === 0) {
+        toast.error('Seleccione un grupo específico')
+        return
+      }
+      setCredencialesLoading(true)
+      const blob = await listasGrupoService.exportCredencialesFamilia(selectedGrupo as number)
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => { window.URL.revokeObjectURL(url) }, 1000)
+      toast.success('Credenciales generadas')
+    } catch (error: any) {
+      toast.error('Error al generar credenciales')
+    } finally {
+      setCredencialesLoading(false)
+    }
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 3 }}>
@@ -176,6 +196,9 @@ export default function ListasGrupoPage() {
                 </Button>
                 <Button variant="outlined" color="primary" startIcon={excelLoading ? <CircularProgress size={20} /> : <ExcelIcon />} onClick={handleExportExcel} disabled={!selectedPeriodo || selectedGrupo === '' || excelLoading} fullWidth>
                   {excelLoading ? 'Generando...' : 'Exportar Excel'}
+                </Button>
+                <Button variant="contained" color="success" startIcon={credencialesLoading ? <CircularProgress size={20} color="inherit" /> : <PrintIcon />} onClick={handleCredencialesFamilia} disabled={!selectedPeriodo || !selectedGrupo || selectedGrupo === 0 || credencialesLoading} fullWidth>
+                  {credencialesLoading ? 'Generando...' : 'Credenciales Familia'}
                 </Button>
               </Box>
             </Grid>
