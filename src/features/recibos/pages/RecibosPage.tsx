@@ -25,7 +25,10 @@ const RecibosPage: React.FC = () => {
   const [alumno, setAlumno] = useState<Alumno | null>(null)
   const [nombreCliente, setNombreCliente] = useState('')
   const [detalles, setDetalles] = useState<ReciboDetalleRequest[]>([])
-  const [fecha, setFecha] = useState<string>(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState<string>(() => {
+    const d = new Date()
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0]
+  })
 
   const [alumnoModal, setAlumnoModal] = useState(false)
   const [pendientesModal, setPendientesModal] = useState(false)
@@ -104,7 +107,8 @@ const RecibosPage: React.FC = () => {
     setDetalles([])
     setAlumno(null)
     setNombreCliente('')
-    setFecha(new Date().toISOString().split('T')[0])
+    const d = new Date()
+    setFecha(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0])
   }
 
   const handleAddDetalle = (detalle: ReciboDetalleRequest) => {
@@ -174,7 +178,8 @@ const RecibosPage: React.FC = () => {
     setAlumno(null)
     setNombreCliente('')
     setDetalles([])
-    setFecha(new Date().toISOString().split('T')[0])
+    const d = new Date()
+    setFecha(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0])
   }
 
   if (!canView) {

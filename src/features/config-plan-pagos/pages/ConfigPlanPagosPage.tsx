@@ -43,6 +43,7 @@ import {
 import { toast } from 'react-hot-toast'
 
 import { usePermissions } from '@/hooks/usePermissions'
+import { PermissionGuard } from '@/components/PermissionGuard'
 import { useInitialLoad } from '@/hooks/useInitialLoad'
 import type { 
   ConfigPlanPago, 
@@ -58,6 +59,7 @@ import planPagoService from '../services/planPagoService'
 import PlanPagoModal from '../components/PlanPagoModal'
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog'
 import AuditoriaViewer from '../components/AuditoriaViewer'
+import { UserArancelesService } from '@/features/alumnos/services/userArancelesService'
 
 const ConfigPlanPagosPage: React.FC = () => {
   const router = useRouter()
@@ -73,6 +75,7 @@ const ConfigPlanPagosPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(0)
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [totalItems, setTotalItems] = useState(0)
+  const [syncing, setSyncing] = useState(false)
 
   // Estados de filtros
   const [filters, setFilters] = useState<PlanPagoTableFilters>({
@@ -297,6 +300,21 @@ const ConfigPlanPagosPage: React.FC = () => {
     loadPlanesPago()
   }
 
+  // Handler para sincronizar recargos globalmente
+  const handleSincronizarRecargos = async () => {
+    try {
+      setSyncing(true)
+      const response = await UserArancelesService.aplicarRecargosManual()
+      if (response.success) {
+        toast.success(response.message || 'Recargos aplicados exitosamente en toda la escuela')
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Error al aplicar recargos manuales')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Card>
@@ -307,10 +325,21 @@ const ConfigPlanPagosPage: React.FC = () => {
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Tooltip title="Refrescar">
-                <IconButton onClick={handleRefresh} disabled={loading}>
+                <IconButton onClick={handleRefresh} disabled={loading || syncing}>
                   <RefreshIcon />
                 </IconButton>
               </Tooltip>
+              <PermissionGuard permission='users_aranceles.aplicar_recargos'>
+                <Button 
+                  variant='outlined' 
+                  color='warning'
+                  startIcon={syncing ? <CircularProgress size={16} /> : <RefreshIcon />} 
+                  onClick={handleSincronizarRecargos} 
+                  disabled={syncing}
+                >
+                  Sincronizar Recargos General
+                </Button>
+              </PermissionGuard>
               {canCreate && (
                 <Button
                   variant="contained"

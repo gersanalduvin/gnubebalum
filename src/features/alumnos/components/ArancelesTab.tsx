@@ -460,6 +460,21 @@ export default function ArancelesTab({ userId }: ArancelesTabProps) {
     }
   }
 
+  const handleAplicarRecargosManual = async () => {
+    try {
+      setProcesandoAccion(true)
+      const response = await UserArancelesService.aplicarRecargosManual(userId)
+      if (response.success) {
+        toast.success(response.message || 'Recargos aplicados exitosamente')
+        loadAranceles()
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Error al aplicar recargos manuales')
+    } finally {
+      setProcesandoAccion(false)
+    }
+  }
+
   // Abrir modal de aplicar plan de pago
   const handleOpenAplicarPlanModal = () => {
     setOpenAplicarPlanModal(true)
@@ -652,6 +667,18 @@ export default function ArancelesTab({ userId }: ArancelesTabProps) {
           <PermissionGuard permission='users_aranceles.aplicar_plan_pago'>
             <Button variant='contained' startIcon={<AddIcon />} onClick={handleOpenAplicarPlanModal} size='small'>
               Nuevo Plan
+            </Button>
+          </PermissionGuard>
+          <PermissionGuard permission='users_aranceles.aplicar_recargos'>
+            <Button 
+              variant='outlined' 
+              color='warning'
+              startIcon={procesandoAccion ? <CircularProgress size={16} /> : <RefreshIcon />} 
+              onClick={handleAplicarRecargosManual} 
+              size='small'
+              disabled={procesandoAccion}
+            >
+              Sincronizar Recargos
             </Button>
           </PermissionGuard>
         </Box>

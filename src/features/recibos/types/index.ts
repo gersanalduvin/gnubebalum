@@ -30,6 +30,8 @@ export interface ArancelPendiente {
   producto_id?: number
   importe_total: number
   saldo_actual: number
+  recargo?: number
+  importe?: number
   estado: string
   rubro?: {
     id: number

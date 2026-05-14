@@ -339,6 +339,24 @@ export class UserArancelesService {
   }
 
   /**
+   * Aplicar recargos manualmente a los aranceles vencidos
+   * @param userId Opcional, si se envía solo aplicará los recargos para ese usuario
+   */
+  static async aplicarRecargosManual(userId?: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await httpClient.post<any>(`${API_BASE}/aplicar-recargos-vencidos`, { user_id: userId })
+
+      return {
+        success: true,
+        data: response.data || null,
+        message: response.message || 'Recargos aplicados exitosamente'
+      }
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
+  }
+
+  /**
    * Obtener períodos lectivos
    */
   static async getPeriodosLectivos(): Promise<PeriodoLectivo[]> {

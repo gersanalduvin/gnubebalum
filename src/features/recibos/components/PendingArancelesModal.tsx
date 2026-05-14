@@ -46,19 +46,68 @@ const PendingArancelesModal: React.FC<Props> = ({ open, alumno, onClose, onAdd, 
       toast.error('Debe pagar primero los rubros de meses anteriores')
       return
     }
-    const detalle: ReciboDetalleRequest = {
-      concepto: item.rubro?.nombre || 'Rubro pendiente',
-      cantidad: 1,
-      monto: Number(monto) || 0,
-      tipo_pago: 'total',
-      rubro_id: item.rubro_id,
-      aranceles_id: item.aranceles_id
-    }
+    const recargo = Number(item.recargo || 0)
+    // saldo de la base = saldo actual - recargo
+    // Importante: Si el saldo actual es menor que el recargo (porque ya abonó la base y algo del recargo), 
+    // la base pendiente sería 0.
+    const saldoBasePendiente = Math.max(0, Number(item.saldo_actual) - recargo)
+    const saldoRecargoPendiente = Number(item.saldo_actual) - saldoBasePendiente
+
+    let montoRestante = monto
     const ord = (item as any)?.rubro?.orden_mes ?? (item as any)?.orden_mes
-    if (typeof ord !== 'undefined') {
-      ;(detalle as any).orden_mes = typeof ord === 'string' ? parseInt(ord as any, 10) : ord
+
+    // 1. Cobrar la base primero (Opción A)
+    if (saldoBasePendiente > 0 && montoRestante > 0) {
+      const montoBase = Math.min(saldoBasePendiente, montoRestante)
+      const detalleBase: ReciboDetalleRequest = {
+        concepto: item.rubro?.nombre || 'Rubro pendiente',
+        cantidad: 1,
+        monto: montoBase,
+        tipo_pago: 'total',
+        rubro_id: item.rubro_id,
+        aranceles_id: item.aranceles_id
+      }
+      if (typeof ord !== 'undefined') {
+        ;(detalleBase as any).orden_mes = typeof ord === 'string' ? parseInt(ord as any, 10) : ord
+      }
+      onAdd(detalleBase)
+      montoRestante -= montoBase
     }
-    onAdd(detalle)
+
+    // 2. Si sobra saldo o solo quedaba recargo pendiente
+    if (saldoRecargoPendiente > 0 && montoRestante > 0) {
+      const montoRecargo = Math.min(saldoRecargoPendiente, montoRestante)
+      const detalleRecargo: ReciboDetalleRequest = {
+        concepto: `RECARGO DE ${item.rubro?.nombre || 'MES'}`,
+        cantidad: 1,
+        monto: montoRecargo,
+        tipo_pago: 'total',
+        rubro_id: item.rubro_id,
+        aranceles_id: item.aranceles_id
+      }
+      // No le pasamos orden_mes al recargo para que no interfiera doblemente en las validaciones si no es necesario,
+      // o se lo pasamos igual para mantener consistencia.
+      if (typeof ord !== 'undefined') {
+        ;(detalleRecargo as any).orden_mes = typeof ord === 'string' ? parseInt(ord as any, 10) : ord
+      }
+      onAdd(detalleRecargo)
+    }
+
+    // Caso de fallback por si acaso monto = 0 y recargo = 0, simplemente lo agrega normal
+    if (monto === 0 && recargo === 0) {
+      const detalle: ReciboDetalleRequest = {
+        concepto: item.rubro?.nombre || 'Rubro pendiente',
+        cantidad: 1,
+        monto: 0,
+        tipo_pago: 'total',
+        rubro_id: item.rubro_id,
+        aranceles_id: item.aranceles_id
+      }
+      if (typeof ord !== 'undefined') {
+        ;(detalle as any).orden_mes = typeof ord === 'string' ? parseInt(ord as any, 10) : ord
+      }
+      onAdd(detalle)
+    }
   }
 
   const loadPendientes = async () => {
@@ -82,6 +131,8 @@ const PendingArancelesModal: React.FC<Props> = ({ open, alumno, onClose, onAdd, 
               producto_id: p.producto_id != null ? Number(p.producto_id) : undefined,
               importe_total: Number(p.importe_total || 0),
               saldo_actual: Number(p.saldo_actual || 0),
+              recargo: Number(p.recargo || 0),
+              importe: Number(p.importe || 0),
               estado: String(p.estado || ''),
               rubro: p.rubro ? { id: Number(p.rubro.id), codigo: (p.rubro as any).codigo, nombre: p.rubro.nombre, orden_mes: typeof (p.rubro as any)?.orden_mes === 'string' ? parseInt((p.rubro as any).orden_mes as any, 10) : (p.rubro as any)?.orden_mes } : undefined,
               orden_mes: (p as any).orden_mes
@@ -103,6 +154,8 @@ const PendingArancelesModal: React.FC<Props> = ({ open, alumno, onClose, onAdd, 
                     producto_id: p.producto_id != null ? Number(p.producto_id) : undefined,
                     importe_total: Number(p.importe_total || 0),
                     saldo_actual: Number(p.saldo_actual || 0),
+                    recargo: Number(p.recargo || 0),
+                    importe: Number(p.importe || 0),
                     estado: String(p.estado || ''),
                     rubro: p.rubro ? { id: Number(p.rubro.id), codigo: p.rubro.codigo, nombre: p.rubro.nombre, orden_mes: typeof (p.rubro as any)?.orden_mes === 'string' ? parseInt((p.rubro as any).orden_mes as any, 10) : (p.rubro as any)?.orden_mes } : undefined,
                     orden_mes: (p as any).orden_mes
@@ -244,9 +297,16 @@ const PendingArancelesModal: React.FC<Props> = ({ open, alumno, onClose, onAdd, 
                 <ListItemText
                   disableTypography
                   primary={
-                    <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'bold' }}>
-                      {item.rubro?.nombre || 'Rubro pendiente'}
-                    </Typography>
+                    <Box>
+                      <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'bold', color: Number(item.recargo) > 0 ? 'error.main' : 'inherit' }}>
+                        {item.rubro?.nombre || 'Rubro pendiente'}
+                      </Typography>
+                      {Number(item.recargo) > 0 && (
+                        <Typography variant="caption" color="error.main" sx={{ fontWeight: 'bold' }}>
+                          ⚠️ Incluye recargo de C$ {Number(item.recargo).toFixed(2)}
+                        </Typography>
+                      )}
+                    </Box>
                   }
                 />
                 <Box sx={{ minWidth: 200, ml: 2, display: 'flex', alignItems: 'center' }}>
