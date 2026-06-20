@@ -124,7 +124,7 @@ const GradesView = ({ studentId }: Props) => {
         const data: any = await parentService.getChildGrades(studentId)
         if (data && data.boleta) {
           setGrades(data.boleta)
-          setTieneDeuda(data.tiene_deuda)
+          setTieneDeuda(data.tiene_deuda || data.config?.bloquear_notas_familia)
         } else {
           setGrades(data)
         }

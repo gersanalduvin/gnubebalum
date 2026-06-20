@@ -12,6 +12,7 @@ export interface ConfPeriodoLectivo {
   incremento_familia: number;
   periodo_nota: boolean;
   periodo_matricula: boolean;
+  bloquear_notas_familia: boolean;
   uuid: string;
   is_synced: boolean;
   synced_at: string | null;
@@ -47,6 +48,7 @@ export interface CreatePeriodoLectivoRequest {
   incremento_familia: number;
   periodo_nota?: boolean;
   periodo_matricula?: boolean;
+  bloquear_notas_familia?: boolean;
 }
 
 // Tipo para actualizar un período lectivo

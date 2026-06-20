@@ -40,6 +40,7 @@ interface FormData {
   incremento_familia: number
   periodo_nota: boolean
   periodo_matricula: boolean
+  bloquear_notas_familia: boolean
 }
 
 interface FormErrors {
@@ -65,7 +66,8 @@ const PeriodoLectivoModal = ({ open, mode, periodoLectivo, onClose, onSuccess }:
     incremento_docente: 1,
     incremento_familia: 1,
     periodo_nota: false,
-    periodo_matricula: false
+    periodo_matricula: false,
+    bloquear_notas_familia: false
   })
   
   const [errors, setErrors] = useState<FormErrors>({})
@@ -85,7 +87,8 @@ const PeriodoLectivoModal = ({ open, mode, periodoLectivo, onClose, onSuccess }:
         incremento_docente: periodoLectivo.incremento_docente,
         incremento_familia: periodoLectivo.incremento_familia,
         periodo_nota: periodoLectivo.periodo_nota,
-        periodo_matricula: periodoLectivo.periodo_matricula
+        periodo_matricula: periodoLectivo.periodo_matricula,
+        bloquear_notas_familia: periodoLectivo.bloquear_notas_familia
       })
     } else if (open && mode === 'create') {
       // Resetear formulario para crear
@@ -99,7 +102,8 @@ const PeriodoLectivoModal = ({ open, mode, periodoLectivo, onClose, onSuccess }:
         incremento_docente: 1,
         incremento_familia: 1,
         periodo_nota: false,
-        periodo_matricula: false
+        periodo_matricula: false,
+        bloquear_notas_familia: false
       })
     }
     
@@ -131,7 +135,7 @@ const PeriodoLectivoModal = ({ open, mode, periodoLectivo, onClose, onSuccess }:
     }
   }, [errors])
 
-  const handleSwitchChange = useCallback((field: 'periodo_nota' | 'periodo_matricula') => (
+  const handleSwitchChange = useCallback((field: 'periodo_nota' | 'periodo_matricula' | 'bloquear_notas_familia') => (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     setFormData(prev => ({
@@ -207,7 +211,8 @@ return Object.keys(newErrors).length === 0
         incremento_docente: formData.incremento_docente,
         incremento_familia: formData.incremento_familia,
         periodo_nota: formData.periodo_nota,
-        periodo_matricula: formData.periodo_matricula
+        periodo_matricula: formData.periodo_matricula,
+        bloquear_notas_familia: formData.bloquear_notas_familia
       }
 
       let response
@@ -449,6 +454,22 @@ return Object.keys(newErrors).length === 0
                 />
               }
               label="Período de Matrícula"
+              sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.875rem' } }}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={formData.bloquear_notas_familia}
+                  onChange={handleSwitchChange('bloquear_notas_familia')}
+                  disabled={loading}
+                  color="warning"
+                />
+              }
+              label="Bloquear Notas a Familias"
               sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.875rem' } }}
             />
           </Grid>
